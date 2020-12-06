@@ -9,9 +9,7 @@
 ;ex 3.14 function taking 5 arguments and returns average of mid 3
 
 (define (avg_of_mid_3 x1 x2 x3 x4 x5)
-(/
-  (+ x1 x2 x3 x4 x5 (- (max x1 x2 x3 x4 x5)) (- (min x1 x2 x3 x4 x5)))
-3))
+(/(+ x1 x2 x3 x4 x5 (- (max x1 x2 x3 x4 x5)) (- (min x1 x2 x3 x4 x5))) 3))
 
 (avg_of_mid_3 1 2 3 4 500)
 
