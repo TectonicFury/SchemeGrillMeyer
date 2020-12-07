@@ -6,7 +6,7 @@
 
 (define (cube-root-newton x guess)
   (let ( (new_guess (/ (+ (/ x (square guess)) (* 2.0 guess)) 3.0)) )
-    (if (< (abs (- guess new_guess)) 0.00001)
+    (if (< (abs (- guess new_guess)) 0.0001)
     guess
     (cube-root-newton x new_guess)
     )
