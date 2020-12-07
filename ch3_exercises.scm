@@ -22,3 +22,14 @@
 (define (celsius_to_fahrenheit temp_in_c) (+ (/ (* temp_in_c 9) 5) 32))
 
 (celsius_to_fahrenheit t)
+
+;ex 3.21
+(define (palindrome_year year)
+  (let (
+    ( first_two (- year 1) )
+    ( third (remainder (- year 1) 10) )
+    ( fourth (/ year 10) )
+    ))
+       (+ (* first_two 100) (* third 10) fourth))
+
+(palindrome_year 20)
