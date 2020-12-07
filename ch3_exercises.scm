@@ -1,5 +1,5 @@
 ;ex 3.13 average of 3 numbers
-
+;grill meyers book exercises
 (define (avg_of_3 x1 x2 x3)
 (/
 (+ x1 x2 x3)
