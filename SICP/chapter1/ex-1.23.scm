@@ -39,9 +39,8 @@
   (define (prime-test n m)
     (cond ((> (sqr m) n)  n)
           ((divisor-test? n m) m)
-          (else (prime-test n (cond ((= m 2) 3)
-                (else (+ m 2))
-          ))))
+          (else (prime-test n (next a)))
+    )
   )
 
 
