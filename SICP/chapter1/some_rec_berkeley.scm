@@ -1,0 +1,18 @@
+(define (num-steps-ways n)
+  (cond ((= n 1) 1)
+        ((= n 2) 2)
+        ((= n 0) 0)
+        (else (+ (num-steps-ways (- n 1)) (num-steps-ways (- n 2))))
+  )
+)
+
+(define (num-ways n) (num-ways-iter 2 1 n 2))
+
+(define (num-ways-iter s1 s2 n count)
+  (cond ((= n 0) 0)
+        ((= n 1) 1)
+        ((= n 2) 2)
+        ((= n count) s1)
+        (else (num-ways-iter (+ s1 s2) s1 n (+ count 1)))
+  )
+)
