@@ -21,7 +21,7 @@
 (define (timed-prime-test n) (newline)
 (display n)
 (start-prime-test n (runtime)))
-(define (start-prime-test n start-time) (if (fast-prime? n 100 1000)
+(define (start-prime-test n start-time) (if (fast-prime? n 100 1)
 (report-prime (- (runtime) start-time)))) (define (report-prime elapsed-time)
 (display " *** ") (display elapsed-time))
 
