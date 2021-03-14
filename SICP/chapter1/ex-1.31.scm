@@ -1,4 +1,7 @@
-(define (product f a next b) (if (> a b) 1 (* (f a) (product f (next a) next b))))
+(define (product f a next b)
+  (if (> a b)
+    1
+  (* (f a) (product f (next a) next b))))
 (define (identity x) x)
 (define (inc x) (+ x 1))
 (define (factorial n) (product identity 1 inc n))
