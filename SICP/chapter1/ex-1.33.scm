@@ -7,9 +7,12 @@
       )
   )
 )
+;using lambdas as predicate and for next
 (define (rel-prime-prod n)
-  (filtered-accumulate * (lambda (x) (= (gcd x n) 1)) 1 (lambda (x) x) 2 (lambda (x) (+ 1 x)) (- n 1)) 
+  (filtered-accumulate * (lambda (x) (= (gcd x n) 1)) 1 (lambda (x) x) 2 (lambda (x) (+ 1 x)) (- n 1))
 )
+
+(define (prime? n) (fast-prime-miller-rabin? n 5))
 
 (define (gcd a b)
   (if (= b 0)
@@ -18,7 +21,8 @@
   )
 )
 
-(define (prime? n) (fast-prime-miller-rabin? n 5))
+
+
 ;auxilliary functions from previous exercises (1.28)
 (define (expmod-mod base exp m)
   (cond ((and (= (remainder (sqr base) m) 1) (not (or (= base 1) (= base (- m 1))))) 0)
