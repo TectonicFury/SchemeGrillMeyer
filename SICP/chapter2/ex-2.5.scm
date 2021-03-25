@@ -1,0 +1,27 @@
+(define (cons a b)
+  (cond ((and (> a 0) (> b 0)) (* 6 (cons (- a 1) (- b 1))))
+        ((> a 0) (* 2 (cons (- a 1) 0)))
+        ((> b 0) (* 3 (cons 0 (- b 1))))
+        (else 1)
+  )
+)
+
+(define (car x)
+  (define (exp2 y result)
+    (if (= (remainder y 2) 0)
+      (exp2 (/ y 2) (+ result 1))
+      result
+    )
+  )
+  (exp2 x 0)
+)
+
+(define (cdr x)
+  (define (exp3 y result)
+    (if (= (remainder y 3) 0)
+      (exp3 (/ y 3) (+ result 1))
+      result
+    )
+  )
+  (exp3 x 0)
+)
