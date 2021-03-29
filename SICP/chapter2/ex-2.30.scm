@@ -1,0 +1,13 @@
+(define (square-tree items)
+  (cond ((null? items) '())
+        ((not (pair? items)) (* items items))
+        (else (cons (square-tree (car items)) (square-tree (cdr items))))
+  )
+)
+
+(define (sqr-tree-map items)
+  (map (lambda (z) (cond ((pair? z)
+                       (sqr-tree-map z))
+                       (else (* z z))
+                    )) items)
+)
