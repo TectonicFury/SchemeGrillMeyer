@@ -1,7 +1,7 @@
 (define (func_rec n)
-(cond ((< n 3) n)
+	(cond ((< n 3) n)
       (else (+ (func_rec (- n 1)) (* (func_rec (- n 2)) 2) (* (func_rec (- n 3)) 3)))
-)
+		)
 )
 
 (define (funcn n) (func-iter 2 1 0 n 2))
