@@ -1,0 +1,17 @@
+(define (union-set set1 set2)
+  (cond ((null? set1) set2)
+        ((null? set2) set1)
+        ((not (element-of-set? (car set1) set2)) (union-set (cdr set1) (cons (car set1) set2)))
+        (else (union-set (cdr set1) set2))))
+
+(define (element-of-set? x set)
+  (cond ((null? set) false)
+        ((equal? x (car set)) true)
+        (else (element-of-set? x (cdr set)))))
+
+(define (equal? a b)
+  (cond ((and (null? a) (null? b)) #t)
+        ((or (null? a) (null? b)) #f)
+        ((or (and (pair? a) (not (pair? b))) (and (not (pair? a)) (pair? b))) #f)
+        ((and (not (pair? a)) (not (pair? b))) (if (eq? a b) #t #f))
+        (else (and (equal? (car a) (car b)) (equal? (cdr a) (cdr b))))))

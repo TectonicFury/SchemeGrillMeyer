@@ -1,5 +1,6 @@
 (define (equal? a b)
   (cond  ((and (null? a) (null? b)) #t)
          ((or (null? a) (null? b)) #f)
+         ((or (and (pair? a) (not (pair? b))) (and (not (pair? a)) (pair? b))) #f)
          ((and (not (pair? a)) (not (pair? b))) (if (eq? a b) #t #f))
          (else (and (equal? (car a) (car b)) (equal? (cdr a) (cdr b))))))

@@ -1,0 +1,12 @@
+(define rand
+  (let ((init-state 10))
+    (define (reset x)
+      (set! init-state x))
+    (define (generate)
+      (set! init-state (rand-update init-state))
+      init-state)
+      (lambda (m)
+        (cond ((eq? m 'generate) (generate))
+              ((eq? m 'reset) reset)
+              (else (error "Bad message passed -- " m))))
+      ))
