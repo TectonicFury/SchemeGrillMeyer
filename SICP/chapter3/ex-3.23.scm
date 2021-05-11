@@ -58,10 +58,11 @@
           (print-deque deque))))
 
 (define (print-deque deque)
-  (define (iter item-pair)
+  (define (iter item-pair count)
     (cond ((null? item-pair) (newline))
-          (else (display (car (cdr item-pair))) (display " ") (iter (cddr item-pair)))))
-  (iter (front-ptr deque)))
+          ((and (> count 1) (eq? item-pair (front-ptr deque)) (error "PRINT --DEQUE called on cyclic data structure")))
+          (else (display (car (cdr item-pair))) (display " ") (iter (cddr item-pair) (+ 1 count)))))
+  (iter (front-ptr deque) 1))
 
 (define (empty-deque? deque)
   (eq? (car deque) '()))
