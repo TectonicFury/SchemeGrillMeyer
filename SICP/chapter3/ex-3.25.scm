@@ -1,3 +1,4 @@
+;very difficult but الحمد لله this is done
 (define (general-table same-key?)
   (define (assoc key records)
     (cond ((or (null? records) (not (pair? records))) false)
