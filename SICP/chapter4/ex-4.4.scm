@@ -1,0 +1,25 @@
+(define (install-and-type)
+  (define (eval-and exp env)
+    (let ((seq (cdr exp)));extracting the sequence of predicates of the and expression (by removing 'and')
+      (define (iter exps)
+        (cond ((null? exps) true)
+              (else
+                (let ((expr-val (eval (first-exp exps) env)))
+                  (cond ((eq? expr-val false) false)
+                        ((null? (cdr exps)) expr-val)
+                        (else (iter (rest-exps exps))))))))
+      (iter seq)))
+
+  (put 'eval 'and eval-and))
+
+(define (install-or-type)
+  (define (eval-or exp env)
+    (let ((seq (cdr exp)))
+      (define (iter exps)
+        (cond ((null? exps) false)
+              (else
+                (let ((expr-val (eval (first-exp exps) env)))
+                  (cond (expr-val expr-val)
+                        (else (iter (rest-exp exps)))
+      (iter seq))))))))
+  (put 'eval 'or eval-or))

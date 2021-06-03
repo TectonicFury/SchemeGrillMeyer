@@ -1,3 +1,4 @@
+;somehow it seems it is the solution for ex-2.57, i have mixed up file names/contents, buty works fine الحمد لله
 (define (deriv exp var)
   (cond ((number? exp) 0)
         ((variable? exp)
@@ -26,9 +27,9 @@
   (cond ((null? a2) a1)
         ((and (pair? a2) (or (sum? a2) (product? a2) (exponentiation? a2)))
           (cond ((=number? a1 0) a2)
-                ((sum? a2) (append (list '+ a1) (cdr a2)))
+                ((sum? a2) (append (list '+ a1) (cdr a2)));just makes it look more simplified
                 (else (list '+ a1 a2))))
-        ((pair? a2)
+        ((pair? a2); if a2 is simply the list of addend terms, then doing (car a2) won't fetch the '+' symbol when doing make-sum
           (let ((a2sum (make-sum (car a2) (cdr a2))))
             (cond ((=number? a1 0) a2sum)
                   ((=number? a2sum 0) a1)
@@ -42,7 +43,7 @@
 
 (define (make-product m1 m2)
   (cond ((null? m2) m1)
-        ((and (pair? m2) (or (product? m2) (sum? m2) (exponentiation? m2))) ;m2 is having (* ..) form already
+        ((and (pair? m2) (or (product? m2) (sum? m2) (exponentiation? m2))) ;m2 is having (* ..) form already، so we just make a product out of it
           (cond ((=number? m1 0) 0)
                 ((=number? m1 1) m2)
                 ((product? m2) (append (list '* m1) (cdr m2)))

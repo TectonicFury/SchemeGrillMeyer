@@ -2,8 +2,8 @@
   (cond ((number? exp) 0)
         ((variable? exp)
           (if (same-variable? exp var) 1 0))
-        ((sum? exp) (begin (newline) (display "In DERIV:SUM, EXP = ") (display exp) (make-sum (deriv (addend exp) var)
-                              (deriv (augend exp) var))))
+        ((sum? exp) (begin (newline) (display "In DERIV:SUM, EXP = ") (display exp)
+          (make-sum (deriv (addend exp) var) (deriv (augend exp) var))))
         ((product? exp) (begin (newline) (display "In DERIV:PRODUCT, EXP = ") (display exp) (make-sum
                               (make-product (multiplier exp) (deriv (multiplicand exp) var))
                               (make-product (deriv (multiplier exp) var) (multiplicand exp)))))

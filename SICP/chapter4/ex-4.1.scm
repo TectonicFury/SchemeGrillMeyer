@@ -1,0 +1,50 @@
+;ex 4.1 soln for left to right: for right to left, use stack
+(define (list-of-values-l2r exps env);to enforce order of evaluation to be left to right
+  (let ((operands-queue (make-queue)))
+    (define (add-to-queue que exprs) ;to ensure left to right evaluation of args, fill a queue
+      (if (no-operands? exprs)
+          que
+          (begin ((que 'insert-queue!) (first-operand exprs))
+                 (add-to-queue que (rest-operands exprs)))))
+
+    (define (eval-args que evaluated-args)
+      (if (empty-queue? que)
+          evaluated-args
+          (begin (append evaluated-args (list (eval (que 'front-queue) env)))
+                 (que 'delete-queue!)
+                 (eval-args que))))
+    (eval-args (add-to-queue operands-queue exps) '())))
+
+(define (make-queue)
+  (let ((front-ptr '())
+        (rear-ptr '()))
+        (define (empty-queue?)
+          (eq? front-ptr '()))
+        (define (front-queue)
+          (if (empty-queue?)
+              (error "FRONT called on empty queue" front-ptr)
+              (car front-ptr)))
+        (define (insert-queue! item)
+          (let ((new-pair (cons item '())))
+            (cond ((empty-queue?)
+                    (set! front-ptr new-pair)
+                    (set! rear-ptr new-pair)
+                    front-ptr)
+                  (else
+                    (set-cdr! rear-ptr new-pair)
+                    (set! rear-ptr new-pair)
+                    (print-queue)))))
+        (define (delete-queue!)
+          (cond ((empty-queue?)
+                  (error "DELETE! called with on an empty queue" front-ptr))
+                (else
+                  (set! front-ptr (cdr front-ptr))
+                  (print-queue))))
+        (define (print-queue) front-ptr)
+        (define (dispatch m)
+          (cond ((eq? m 'empty-queue?) (empty-queue?))
+                ((eq? m 'insert-queue!) insert-queue!)
+                ((eq? m 'front-queue) (front-queue))
+                ((eq? m 'delete-queue!) (delete-queue!))
+                ((eq? m 'print-queue) (print-queue))))
+        dispatch))
