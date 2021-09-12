@@ -1,0 +1,18 @@
+(define (let*->nested-lets exp)
+  (let ((l*vb (let*-vars-binds exp))
+        (l*body (let*-body exp)))
+    (define (iter rem)
+      (if (null? rem)
+          (sequence->exp l*body)
+          (list 'let (list (car rem)) (iter (cdr rem)))))
+  (iter l*vb)))
+
+(define (sequence->exp seq)
+  (cond ((null? seq) seq)
+        ((last-exp? seq) (first-exp seq))
+        (else (make-begin seq))))
+
+(define (let*-vars-binds exp)
+  (cadr exp))
+(define (let*-body exp)
+  (cddr exp))

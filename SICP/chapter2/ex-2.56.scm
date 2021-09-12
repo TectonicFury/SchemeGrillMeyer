@@ -90,3 +90,4 @@
 
 (define (multiplicand p)
   (make-product (caddr p) (cdr (cdr (cdr p)))))
+;check

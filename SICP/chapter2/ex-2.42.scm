@@ -46,10 +46,6 @@
 (define (empty-board-gen n)
   (map (lambda (x) (map (lambda (y) 0) (enumerate-interval 1 n))) (enumerate-interval 1 n)))
 
-
-
-
-
 ;auxilliary functions
 (define (replace-elem new-elem pos items) ;replace item at position pos in items by new-elem
   (define (iter i res rem)
@@ -65,6 +61,9 @@
 
 (define (flatmap proc seq)
   (accumulate append '() (map proc seq)))
+
+(define (length items)
+  (accumulate + 0 (map (lambda (x) 1) items)))
 
 (define (accumulate op null-value seq)
   (if (null? seq)
