@@ -326,7 +326,8 @@
           (error "unknown expression type: DERIV" exp))))
 
 (define primitive-procedures
-  (list (list 'car car)
+  (list (list 'list list)
+        (list 'car car)
         (list 'cdr cdr)
         (list 'cons cons)
         (list 'null? null?)
@@ -377,6 +378,7 @@
 
 ;; additional forms
 
+;(for (initialise-bindings) (condition-to-check-evry-loop) (update-counter) body)
 (define (for? exp) (tagged-list? exp 'for))
 (define (for-initial-var-binds exp) (cadr exp))
 (define (for-counter exp) (car (cadr exp)))

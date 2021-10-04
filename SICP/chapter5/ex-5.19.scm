@@ -1,0 +1,560 @@
+(define (set-breakpoint machine label offset)
+  ((machine 'set-breakpoint) label offset))
+(define (cancel-breakpoint machine label offset)
+  ((machine 'cancel-breakpoint) label offset))
+(define (cancel-all-breakpoints machine)
+  (machine 'cancel-all-breakpoints))
+(define (proceed-machine machine)
+  (machine 'proceed))
+
+(define (make-machine ops controller-text)
+  (let ((machine (make-new-machine))
+        (register-names (extract-registers controller-text))) ; ex 5.13
+    (display "here") (newline)
+    (for-each
+      (lambda (register-name)
+        ((machine 'allocate-register) register-name))
+        register-names)
+    (display "here2") (newline)
+    ((machine 'install-operations) ops)
+    (display "here3") (newline)
+    ((machine 'install-instruction-sequence) (assemble controller-text machine))
+    machine))
+
+(define (extract-registers controller-text)
+  (display "extract registers") (newline)
+  (let ((registers '()))
+    (define (iter text)
+      (if (null? text)
+          registers
+          (cond ((symbol? (car text)) (iter (cdr text)))
+                ((eq? (caar text) 'assign)
+                  (let ((r (cadr (car text)))
+                        (assign-val-exp (cddr (car text))))
+                    (if (not (memq r registers)) ; check if it is not already extracted
+                        (begin
+                          (set! registers (cons r registers))
+                          (set! registers
+                            (append (no-repeat-regs (find-regs assign-val-exp) registers) registers))
+                          (iter (cdr text)))
+                        (begin
+                          (set! registers
+                            (append (no-repeat-regs (find-regs assign-val-exp) registers) registers))
+                          (iter (cdr text))))))
+                ((eq? (caar text) 'goto)
+                  (let ((dest (cadr (car text))))
+                    (if (eq? (car dest) 'reg)
+                        (let ((r (cadr dest)))
+                          (if (not (memq r registers))
+                              (begin
+                                (set! registers (cons r registers))
+                                (iter (cdr text)))
+                              (iter (cdr text))))
+                        (iter (cdr text)))))
+                ((eq? (caar text) 'save)
+                  (let ((r (cadr (car text))))
+                    (if (not (memq r registers))
+                        (begin
+                          (set! registers (cons r registers))
+                          (iter (cdr text)))
+                        (iter (cdr text)))))
+                ((eq? (caar text) 'restore)
+                  (let ((r (cadr (car text))))
+                    (if (not (memq r registers))
+                        (begin
+                          (set! registers (cons r registers))
+                          (iter (cdr text)))
+                        (iter (cdr text)))))
+                (else (iter (cdr text))))))
+    (iter controller-text)))
+
+;
+(define (no-repeat-regs sample pool)
+  (define (iter2 s finals)
+    (if (null? s)
+        finals
+        (if (not (memq (car s) pool))
+            (iter2 (cdr s) (cons (car s) finals))
+            (iter2 (cdr s) finals))))
+  (iter2 sample '()))
+
+(define (find-regs items)
+  (define (iter regs z)
+    (if (null? z)
+        regs
+        (if (eq? 'reg (caar z))
+            (let ((reg-name (cadr (car z))))
+              (iter (cons reg-name regs) (cdr z)))
+            (iter regs (cdr z)))))
+  (iter '() items))
+
+(define (make-register name)
+  (let ((contents '*unassigned)
+        (tracing false))
+    (define (dispatch message)
+      (cond ((eq? message 'get) contents)
+            ((eq? message 'set)
+              (if tracing
+                  (lambda (value)
+                    (display (list 'assigning name ': 'old-value= contents ': 'new-value= value))
+                    (newline)
+                    (set! contents value))
+                  (lambda (value) (set! contents value))))
+            ((eq? message 'trace-on) (set! tracing true))
+            ((eq? message 'trace-off) (set! tracing false))
+            ((eq? message 'isTraced?) tracing)
+            (else
+              (error "Unknown request: REGISTER" message))))
+    dispatch))
+
+(define (get-contents register)
+  (register 'get))
+(define (set-contents! register value)
+  ((register 'set) value))
+
+(define (make-stack)
+  (let ((s '())
+        (number-pushes 0)
+        (max-depth 0)
+        (current-depth 0))
+    (define (push x)
+      (set! s (cons x s))
+      (set! number-pushes (+ 1 number-pushes))
+      (set! current-depth (+ 1 current-depth))
+      (set! max-depth (max current-depth max-depth)))
+    (define (pop)
+      (if (null? s)
+          (error "Empty stack: POP")
+          (let
+            ((top (car s)))
+            (set! s (cdr s))
+            (set! current-depth (- current-depth 1))
+            top)))
+    (define (initialize)
+      (set! s '())
+      (set! number-pushes 0)
+      (set! max-depth 0)
+      (set! current-depth 0)
+      'done)
+
+    (define (print-statistics)
+      (newline)
+      (display
+        (list 'total-pushes '= number-pushes 'maximum-depth '= max-depth)))
+
+    (define (dispatch message)
+      (cond ((eq? message 'push) push)
+            ((eq? message 'pop) (pop))
+            ((eq? message 'initialize) (initialize))
+            ((eq? message 'print-statistics) (print-statistics))
+            (else (error "Unknown request: STACK" message))))
+    dispatch))
+
+(define (pop stack) (stack 'pop))
+(define (push stack value) ((stack 'push) value))
+; (define (peek stack) (stack 'peek))
+
+;make-new-machine
+(define (make-new-machine)
+  (display "Make-new-machine") (newline)
+  (let ((pc (make-register 'pc))
+        (flag (make-register 'flag))
+        (stack (make-stack))
+        (the-instruction-sequence '())
+        (trace-on false)
+        ;;; the method is to add reference to bp insts to a list and check for individual
+        ;;; insts whether they have breakpoints by comparing equality of reference using eq?
+        ;;; in bp list
+        (breakpoint-insts '())
+        (breakpoint-labels '())
+        (break-execution false)
+        (curr-break-inst '()))
+    (let ((the-ops (list
+                    (list 'initialize-stack (lambda () (stack 'initialize)))
+                    (list 'print-stack-statistics
+                      (lambda () (stack 'print-statistics)))
+                    (list 'read (lambda () (read)))
+                    (list 'print (lambda (x) (display x) (newline)))))
+          (register-table (list (list 'pc pc) (list 'flag flag))))
+      (define (allocate-register name)
+        (if (assoc name register-table)
+            (error "Multiply defined register: " name)
+            (set! register-table (cons (list name (make-register name)) register-table)))
+            'register-allocated)
+      (define (lookup-register name)
+        (let ((val (assoc name register-table)))
+          (if val
+              (cadr val)
+              (error "Unknown register: " name))))
+      (define (execute)
+        (let ((insts (get-contents pc)))
+          (if (null? insts)
+              'done
+              (let ((inst (car insts)))
+                (if (not(null? breakpoint-insts)) ; if breakpoints have been set
+                    (if (labeled-inst? inst)
+                        (if (memq (caddr inst) breakpoint-insts)
+                            (begin
+                              (set! break-execution true)
+                              (set! curr-break-inst (caddr inst))))
+                        (if (memq inst breakpoint-insts)
+                            (begin
+                              (set! break-execution true)
+                              (set! curr-break-inst inst)))))
+
+                (if (not break-execution)
+                    (if (labeled-inst? inst)
+                        (begin
+                          (if trace-on
+                              (begin
+                                (display (cadr inst)) ; label of labeled inst
+                                (newline)
+                                (display (car (caddr inst))) ; instruction text of labeled inst
+                                (newline)))
+                          ((instruction-execution-proc (caddr inst)))
+                          (execute))
+                        (begin ; if it is not a labeled instruction
+                          (if trace-on
+                              (begin
+                                (display (instruction-text inst))
+                                (newline)))
+                          ((instruction-execution-proc inst))
+                          (execute)))
+                    (begin ;need to break execution
+                      (set! break-execution false) ; reset the break flag
+                      (display "Breakpoint label: ")
+                      (if (labeled-inst? inst)
+                          (begin
+                            (display (find-breakpoint-label-using (caddr inst)))
+                            (newline)
+                            (display (instruction-text (caddr inst)))
+                            (newline)
+                            'execution-stopped)
+                          (begin ; not a labeled inst
+                            (display (find-breakpoint-label-using inst))
+                            (newline)
+                            (display (instruction-text inst))
+                            (newline)
+                            'execution-stopped))))))))
+
+      (define (find-breakpoint-inst label offset)
+        (define (iter insts n found-label prev-inst)
+          (cond ((null? insts) (error "Unable to find required instruction"))
+                ((= n 0) prev-inst)
+                (else
+                  (let ((inst (car insts)))
+                    (if (not found-label); the label has not yet been found
+                        (if (labeled-inst? inst)
+                            (let ((inst-label (cadr inst)))
+                              (if (eq? inst-label label)
+                                  (iter (cdr insts) (- n 1) true (caddr inst))
+                                  (iter (cdr insts) n found-label '())))
+                            (iter (cdr insts) n found-label '()))
+                        (if (labeled-inst? inst) ; label is found & there are two
+                            (iter (cdr insts) (- n 1) true (caddr inst)) ; scenarios, the new inst can be labeled or not labeled
+                            (iter (cdr insts) (- n 1) true inst)))))))
+        (iter the-instruction-sequence offset false '()))
+
+      (define (find-breakpoint-label-using inst)
+        (define (iter-find insts labels)
+          (if (null? insts)
+              (error "Unable to locate label for inst: " inst)
+              (if (labeled-inst? (car insts))
+                  (if (eq? inst (caddr insts))
+                      (car labels)
+                      (iter-find (cdr insts) (cdr labels)))
+                  (if (eq? inst (car insts))
+                      (car labels)
+                      (iter-find (cdr insts) (cdr labels))))))
+        (iter-find breakpoint-insts breakpoint-labels))
+
+      (define (dispatch message)
+        (cond ((eq? message 'start)
+                (set-contents! pc the-instruction-sequence)
+                (display "start!") (newline)
+                (execute))
+              ((eq? message 'proceed)
+                (display "Execution resumes") (newline)
+                ((instruction-execution-proc curr-break-inst))
+                (set! curr-break-inst '())
+                (execute))
+              ((eq? message 'install-instruction-sequence)
+                (lambda (seq)
+                  (set! the-instruction-sequence seq)))
+              ((eq? message 'allocate-register)
+                allocate-register)
+              ((eq? message 'get-register)
+                lookup-register)
+              ((eq? message 'install-operations)
+                (lambda (ops)
+                  (set! the-ops (append the-ops ops))))
+              ((eq? message 'stack) stack)
+              ((eq? message 'operations) the-ops)
+              ((eq? message 'trace-on) (set! trace-on true))
+              ((eq? message 'trace-off) (set! trace-on false))
+              ((eq? message 'is-trace-on?) trace-on)
+              ((eq? message 'turn-reg-tracing-on)
+                (lambda (reg)
+                  ((lookup-register reg) 'trace-on)))
+              ((eq? message 'turn-reg-tracing-off)
+                (lambda (reg)
+                  ((lookup-register reg) 'trace-off)))
+              ((eq? message 'set-breakpoint)
+                (lambda (label n)
+                  (let ((bp-inst (find-breakpoint-inst label n)))
+                    (set! breakpoint-insts (cons bp-inst breakpoint-insts))
+                    (set! breakpoint-labels (cons label breakpoint-labels))
+                    'breakpoint-added)))
+              ((eq? message 'cancel-breakpoint)
+                (lambda (label n)
+                  (let ((inst (find-breakpoint-inst label n)))
+                    (define (remove-bp-inst bp-inst)
+                      (define (iter prev rem)
+                        (if (null? rem)
+                            (error "Breakpoint to be removed doesn't exist: " bp-inst)
+                            (if (eq? (car rem) bp-inst)
+                                (begin
+                                  (set! breakpoint-insts (append prev (cdr rem)))
+                                  'breakpoint-cancelled)
+                                (iter (append prev (list (car rem))) (cdr rem)))))
+                      (iter '() breakpoint-insts))
+                   (remove-bp-inst inst))))
+              ((eq? message 'cancel-all-breakpoints)
+                (set! breakpoint-insts '()))
+              (else (error "Unknown request: MACHINE" message))))
+      dispatch)))
+
+(define (start machine) (machine 'start))
+(define (get-register-contents machine register-name)
+  (get-contents (get-register machine register-name)))
+(define (set-register-contents machine register-name value)
+  (set-contents! (get-register machine register-name) value)
+  'done)
+(define (trace-on machine register)
+  ((machine 'turn-reg-tracing-on) register))
+(define (trace-off machine register)
+  ((machine 'turn-reg-tracing-off) register))
+(define (get-register machine reg-name)
+  ((machine 'get-register) reg-name))
+
+; assembler
+
+(define (assemble controller-text machine)
+  (extract-labels
+    controller-text
+    (lambda (insts labels)
+      (update-insts! insts labels machine)
+      insts)))
+(define (extract-labels text receive)
+  ;(display text)(newline)(newline)
+  (if (null? text)
+      (begin
+        ;(display "receiving") (newline) (newline)
+        (receive '() '()))
+      (begin
+        ;(display "begin") (newline)
+        ;(display text) (newline)(newline)
+        (extract-labels
+        (cdr text)
+        (lambda (insts labels)
+          (display "receive function")(newline)
+          (display text)
+          (newline)
+          (newline)
+          (let ((next-inst (car text)))
+            (if (symbol? next-inst)
+                (if (assoc next-inst labels)
+                    (error "Same label used twice: EXTRACT-LABELS" next-inst)
+                    (receive (make-labeled-instructions insts next-inst)
+                             (cons (make-label-entry
+                                      next-inst
+                                      (make-labeled-instructions insts next-inst)) labels)))
+                (receive (cons (make-instruction next-inst) insts) labels))))))))
+
+(define (update-insts! insts labels machine)
+  (display "Update insts in process")
+  (newline)
+  (let ((pc (get-register machine 'pc))
+        (flag (get-register machine 'flag))
+        (stack (machine 'stack))
+        (ops (machine 'operations)))
+    (for-each
+      (lambda (inst)
+        (display inst)
+        (newline)
+        (if (labeled-inst? inst)
+            (set-instruction-execution-proc!
+              (caddr inst) (make-execution-procedure
+                    (instruction-text (caddr inst)) labels machine pc flag stack ops))
+            (set-instruction-execution-proc!
+              inst (make-execution-procedure
+                    (instruction-text inst) labels machine pc flag stack ops))))
+      insts)))
+(define (labeled-inst? inst)
+  (if (eq? (car inst) 'labeled)
+      true
+      false))
+(define (make-instruction text)
+ (cons text '()))
+(define (make-labeled-instructions insts label) ;ex 5.17
+  (if (null? insts)
+      '()
+      (cons (list 'labeled label (car insts)) (cdr insts))))
+(define (instruction-text inst) (car inst)) ;instruction text is useful for debugging, though not used by simulator
+(define (instruction-execution-proc inst) (cdr inst))
+(define (set-instruction-execution-proc! inst proc) (set-cdr! inst proc))
+
+(define (make-label-entry label-name insts) (cons label-name insts))
+
+(define (lookup-label labels label-name)
+  (let ((val (assoc label-name labels)))
+    (if val
+        (cdr val)
+        (error "Undefined label: ASSEMBLE" label-name))))
+
+; making execution procedures
+(define (make-execution-procedure inst labels machine pc flag stack ops)
+  (cond ((eq? (car inst) 'assign) (make-assign inst machine labels ops pc))
+        ((eq? (car inst) 'test) (make-test inst machine labels ops flag pc))
+        ((eq? (car inst) 'branch) (make-branch inst machine labels flag pc))
+        ((eq? (car inst) 'goto) (make-goto inst machine labels pc))
+        ((eq? (car inst) 'save) (make-save inst machine stack pc))
+        ((eq? (car inst) 'restore) (make-restore inst machine stack pc))
+        ((eq? (car inst) 'perform) (make-perform inst machine labels ops pc))
+        (else (error "Unknown instruction type: ASSEMBLE" inst))))
+
+(define (make-assign inst machine labels operations pc)
+  (let ((target (get-register machine (assign-reg-name inst)))
+        (value-exp (assign-value-exp inst)))
+    (let ((value-proc
+            (if (operation-exp? value-exp)
+                (make-operation-exp value-exp machine labels operations)
+                (make-primitive-exp (car value-exp) machine labels))))
+      (lambda ()
+        (set-contents! target (value-proc))
+        (advance-pc pc)))))
+(define (assign-reg-name assign-instruction)
+  (cadr assign-instruction))
+(define (assign-value-exp assign-instruction)
+  (cddr assign-instruction))
+(define (advance-pc pc)
+  (set-contents! pc (cdr (get-contents pc))))
+
+(define (make-test inst machine labels operations flag pc)
+  (let ((condition (test-condition inst)))
+    (if (operation-exp? condition)
+        (let ((condition-proc (make-operation-exp condition machine labels operations)))
+          (lambda ()
+            (set-contents! flag (condition-proc))
+            (advance-pc pc)))
+        (error "Bad TEST instruction: ASSEMBLE" inst))))
+
+(define (test-condition test-instruction)
+  (cdr test-instruction))
+
+(define (make-branch inst machine labels flag pc)
+  (let ((dest (branch-dest inst)))
+    (if (label-exp? dest)
+        (let ((insts (lookup-label labels (label-exp-label dest))))
+          (lambda ()
+            (if (get-contents flag)
+                (set-contents! pc insts)
+                (advance-pc pc))))
+        (error "Bad branch instruction: ASSEMBLE" inst))))
+
+(define (branch-dest branch-instruction)
+  (cadr branch-instruction))
+
+(define (make-goto inst machine labels pc)
+  (let ((dest (goto-dest inst)))
+    (cond ((label-exp? dest)
+            (let ((insts (lookup-label labels (label-exp-label dest))))
+              (lambda () (set-contents! pc insts))))
+          ((register-exp? dest)
+            (let ((reg (get-register machine (register-exp-reg dest))))
+              (lambda () (set-contents! pc (get-contents reg)))))
+          (else (error "Bad GOTO instruction" inst)))))
+
+(define (goto-dest goto-instruction)
+  (cadr goto-instruction))
+
+(define (make-save inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+    (lambda ()
+      (push stack (get-contents reg))
+      (advance-pc pc))))
+
+(define (make-restore inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+    (lambda ()
+      ;(display "restoring") (newline)
+      ;(display reg) (newline)
+      (set-contents! reg (pop stack))
+      ;(display "restored") (newline)
+      (advance-pc pc))))
+
+(define (stack-inst-reg-name stack-instruction)
+  (cadr stack-instruction))
+
+(define (make-perform inst machine labels operations pc)
+  (let ((action (perform-action inst)))
+    (if (operation-exp? action)
+        (let ((action-proc
+                (make-operation-exp action machine labels operations)))
+          (lambda ()
+            (action-proc)
+            (advance-pc pc)))
+        (error "Bad PERFORM instruction: ASSEMBLE" inst))))
+(define (perform-action inst)
+  (cdr inst))
+
+; subexpression execution procedures
+
+(define (make-primitive-exp exp machine labels)
+  (cond ((constant-exp? exp)
+          (let ((c (constant-exp-value exp)))
+            (lambda () c)))
+        ((label-exp? exp)
+          (let ((insts (lookup-label labels (label-exp-label exp))))
+            (lambda () insts)))
+        ((register-exp? exp)
+          (let ((r (get-register machine (register-exp-reg exp))))
+            (lambda () (get-contents r))))
+        (else (error "Unknown expression type: ASSEMBLE" exp))))
+
+(define (register-exp? exp) (tagged-list? exp 'reg))
+(define (register-exp-reg exp) (cadr exp))
+(define (constant-exp? exp) (tagged-list? exp 'const))
+(define (constant-exp-value exp) (cadr exp))
+(define (label-exp? exp) (tagged-list? exp 'label))
+(define (label-exp-label exp) (cadr exp))
+
+(define (make-operation-exp exp machine labels operations)
+  (let ((op (lookup-prim (operation-exp-op exp) operations))
+        (aprocs
+          (map
+            (lambda (e)
+              (if (label-exp? e) ;ex 5.9
+                  (error "Operations can't be used with labels: ASSEMBLE" e)
+                  (make-primitive-exp e machine labels)))
+            (operation-exp-operands exp))))
+    (lambda ()
+      (apply op (map (lambda (p) (p)) aprocs)))))
+
+(define (operation-exp? exp)
+  (and (pair? exp) (tagged-list? (car exp) 'op)))
+(define (operation-exp-op operation-exp)
+  (cadr (car operation-exp)))
+(define (operation-exp-operands operation-exp)
+  (cdr operation-exp))
+
+(define (lookup-prim symbol operations)
+  (let ((val (assoc symbol operations)))
+    (if val
+        (cadr val)
+        (error "Unknown operation: ASSEMBLE" symbol))))
+;
+(define (tagged-list? exp tag)
+  (if (pair? exp)
+      (eq? (car exp) tag)
+      false))
