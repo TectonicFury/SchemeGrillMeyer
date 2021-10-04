@@ -1,3 +1,4 @@
+; FOr later : Deletion and frequency counter 
 (define (make-rbt same? less? more?)
   (let ((rbt (list '*rbt*)))
 
