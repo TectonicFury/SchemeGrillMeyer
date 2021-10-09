@@ -1,5 +1,1 @@
-الله اكبر
-
-I am learning Scheme الحمد لله!
-
-I can never thank الله enough for His favours on me.
+Code repository for the book "Structure and Interpretation of Computer Programs"
